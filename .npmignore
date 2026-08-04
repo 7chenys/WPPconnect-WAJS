@@ -1,0 +1,10 @@
+.*
+*.tgz
+*.zip
+/docs
+/src
+/tsconfig.json
+/typedoc.json
+/userDataDir
+/wa-source
+/webpack.config.js

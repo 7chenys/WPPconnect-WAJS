@@ -1,0 +1,92 @@
+{
+  // Use o IntelliSense para saber mais sobre os atributos possíveis.
+  // Focalizar para exibir as descrições dos atributos existentes.
+  // Para obter mais informações, acesse: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Chrome",
+      "request": "launch",
+      "type": "chrome",
+      "url": "about:blank",
+      "disableNetworkCache": true,
+      "webRoot": "${workspaceFolder}",
+      "userDataDir": "${workspaceFolder}/userDataDir",
+      "port": 9222,
+      "runtimeArgs": ["--auto-open-devtools-for-tabs"],
+      "pathMapping": {
+        "webpack:///./~/*": "${workspaceFolder}/node_modules/*",
+        "webpack:////*": "/*",
+        "webpack://?:*/*": "${workspaceFolder}/*",
+        "webpack:///([a-z]):/(.+)": "$1:/$2",
+        "/dist": "${workspaceFolder}/dist",
+        "/": "${workspaceFolder}/wa-source"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Chrome",
+      "presentation": {
+        "hidden": false,
+        "group": "Other",
+        "order": 2
+      },
+      "preLaunchTask": "npm: watch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "launch:attach"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch Browser",
+      "presentation": {
+        "hidden": false,
+        "group": "Other Old",
+        "order": 2
+      },
+      "preLaunchTask": "npm: watch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "launch:local",
+        "--",
+        "--remote-debugging-port=9222"
+      ]
+    },
+    {
+      "type": "chrome",
+      "request": "attach",
+      "name": "Attach Browser",
+      "presentation": {
+        "hidden": false,
+        "group": "Other Old",
+        "order": 2
+      },
+      "address": "127.0.0.1",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}",
+      "pathMapping": {
+        "webpack:///./~/*": "${workspaceFolder}/node_modules/*",
+        "webpack:////*": "/*",
+        "webpack://?:*/*": "${workspaceFolder}/*",
+        "webpack:///([a-z]):/(.+)": "$1:/$2",
+        "/dist": "${workspaceFolder}/dist",
+        "/": "${workspaceFolder}/wa-source"
+      },
+      "timeout": 60000,
+      "restart": true
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Launch and Debug",
+      "presentation": {
+        "hidden": false,
+        "group": "Launch",
+        "order": 1
+      },
+      "configurations": ["Launch Chrome", "Debug Chrome"]
+    }
+  ]
+}

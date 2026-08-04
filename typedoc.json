@@ -1,0 +1,13 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "disableSources": false,
+  "entryPoints": ["src/index.ts"],
+  "excludeExternals": false,
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "includeVersion": true,
+  "out": "docs",
+  "plugin": ["typedoc-plugin-mdn-links"],
+  // "theme": "google-tag-manager",
+  //"gaID": "G-LTZL26963K"
+}

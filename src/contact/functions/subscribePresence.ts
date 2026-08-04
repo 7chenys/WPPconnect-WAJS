@@ -1,0 +1,62 @@
+/*!
+ * Copyright 2024 WPPConnect Team
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import { PresenceStore, Wid, WidFactory } from '../../whatsapp';
+import {
+  subscribeGroupPresence,
+  subscribePresence as sendSubscribePresence,
+} from '../../whatsapp/functions';
+
+/**
+ * Subscribe presente from a contact
+ *
+ * @example
+ * ```javascript
+ * await WPP.contact.subscribePresence('[number]@c.us');
+ * ```
+ *
+ * @category Contact
+ */
+
+export async function subscribePresence(
+  ids: string | string[]
+): Promise<Wid[]> {
+  if (!Array.isArray(ids)) {
+    ids = [ids];
+  }
+
+  const result = [];
+  for (const id of ids) {
+    try {
+      const wid = WidFactory.createWid(id);
+      // WA >= ~2.3000.1039447205 split subscribePresence into separate user/group functions.
+      // subscribePresence already maps to subscribeUserPresence on new WA via exportModule fallback,
+      // but group JIDs require the dedicated subscribeGroupPresence call when available.
+      if (subscribeGroupPresence && wid.isGroup()) {
+        subscribeGroupPresence(wid);
+      } else {
+        await sendSubscribePresence(wid);
+      }
+      if (PresenceStore.get(wid)) {
+        result.push(wid);
+        continue;
+      }
+      await PresenceStore.find(wid);
+      result.push(wid);
+    } catch (_error) {}
+  }
+  return result;
+}

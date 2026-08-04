@@ -1,0 +1,11 @@
+*.tgz
+/.idea
+/debug.log
+/dist/
+/docs
+/media
+/node_modules
+/userDataDir*
+/wa-source
+yarn.lock
+wppconnect/

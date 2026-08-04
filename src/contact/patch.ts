@@ -1,0 +1,78 @@
+/*!
+ * Copyright 2023 WPPConnect Team
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import * as loader from '../loader';
+import { ContactModel, functions } from '../whatsapp';
+
+loader.onInjected(applyPatch);
+
+function applyPatch() {
+  const funcs: {
+    [key: string]: (...args: any[]) => any;
+  } = {
+    isMyContact: functions.getIsMyContact,
+    mentionName: functions.getMentionName,
+    notifyName: functions.getNotifyName,
+    pnForLid: functions.getPnForLid,
+    displayNameOrPnForLid: functions.getDisplayNameOrPnForLid,
+    formattedPhone: functions.getFormattedPhone,
+    userid: functions.getUserid,
+    // getUserhash was removed from WAWebContactGetters in WA ~2.3000.1043126001,
+    // reimplement the same logic using WAMd5 when it is missing
+    userhash:
+      functions.getUserhash ??
+      ((contact: ContactModel) =>
+        contact.id.isUser()
+          ? functions.md5((contact.id.user || '') + 'WA_ADD_NOTIF')
+          : null),
+    searchName: functions.getSearchName,
+    searchVerifiedName: functions.getSearchVerifiedName,
+    header: functions.getHeader,
+    isMe: functions.getIsMe,
+    isUser: (contact: ContactModel) => () => contact.id.isUser(),
+    isGroup: (contact: ContactModel) => () => contact.id.isGroup(),
+    isBroadcast: (contact: ContactModel) => () => contact.id.isBroadcast(),
+    isPSA: (contact: ContactModel) => () => contact.id.isPSA(),
+    isIAS: functions.getIsIAS,
+    isSupportAccount: functions.getIsSupportAccount,
+    formattedShortNameWithNonBreakingSpaces:
+      functions.getFormattedShortNameWithNonBreakingSpaces,
+    formattedShortName: functions.getFormattedShortName,
+    formattedName: functions.getFormattedName,
+    formattedUser: functions.getFormattedUser,
+    isWAContact: functions.getIsWAContact,
+    canRequestPhoneNumber: functions.getCanRequestPhoneNumber,
+    showBusinessCheckmarkAsPrimary: functions.getShowBusinessCheckmarkAsPrimary,
+    showBusinessCheckmarkAsSecondary:
+      functions.getShowBusinessCheckmarkAsSecondary,
+    showBusinessCheckmarkInChatlist:
+      functions.getShowBusinessCheckmarkInChatlist,
+    isDisplayNameApproved: functions.getIsDisplayNameApproved,
+    shouldForceBusinessUpdate: functions.getShouldForceBusinessUpdate,
+  };
+
+  for (const attr in funcs) {
+    const func = funcs[attr];
+    if (typeof (ContactModel.prototype as any)[attr] === 'undefined') {
+      Object.defineProperty(ContactModel.prototype, attr, {
+        get: function () {
+          return func(this);
+        },
+        configurable: true,
+      });
+    }
+  }
+}

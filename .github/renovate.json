@@ -1,0 +1,58 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:base", ":prHourlyLimitNone", ":semanticCommits"],
+  "prConcurrentLimit": 3,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true
+  },
+  "packageRules": [
+    {
+      "description": "Use bump strategy",
+      "matchPackagePatterns": ["*"],
+      "rangeStrategy": "bump",
+      "semanticCommitType": "build",
+      "labels": ["dependencies"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "semanticCommitType": "ci",
+      "addLabels": ["github_actions"]
+    },
+    {
+      "matchManagers": ["npm"],
+      "addLabels": ["javascript"]
+    },
+    {
+      "matchDepTypes": ["devDependencies"],
+      "semanticCommitScope": "deps-dev"
+    },
+    {
+      "description": "Automatically merge minor and patch-level updates",
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "automerge": true,
+      "automergeStrategy": "squash",
+      "automergeType": "pr"
+    },
+    {
+      "description": "Ignore major version",
+      "matchPackageNames": ["@types/node"],
+      "allowedVersions": "<17"
+    },
+    {
+      "description": "Ignore major version",
+      "matchPackageNames": ["@types/node-fetch", "node-fetch"],
+      "allowedVersions": "<3"
+    },
+    {
+      "description": "Ignore major version",
+      "matchPackageNames": ["file-type"],
+      "allowedVersions": "<17"
+    },
+    {
+      "description": "TypeScript 7 is the native compiler and no longer ships the JS compiler API (ts.sys and friends). ts-loader, ts-node, typedoc and typescript-eslint all break on it, so stay on the 5.x/6.x line until they support it",
+      "matchPackageNames": ["typescript"],
+      "allowedVersions": "<7"
+    }
+  ]
+}

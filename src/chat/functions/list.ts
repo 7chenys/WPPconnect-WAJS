@@ -1,0 +1,155 @@
+/*!
+ * Copyright 2024 WPPConnect Team
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import {
+  ChatModel,
+  ChatStore,
+  GroupMetadataStore,
+  LabelStore,
+  NewsletterStore,
+  Wid,
+} from '../../whatsapp';
+import { get } from './get';
+
+export interface ChatListOptions {
+  id?: Wid;
+  count?: number;
+  direction?: 'after' | 'before';
+  onlyCommunities?: boolean;
+  onlyGroups?: boolean;
+  onlyNewsletter?: boolean;
+  onlyUsers?: boolean;
+  onlyWithUnreadMessage?: boolean;
+  onlyArchived?: boolean;
+  withLabels?: string[];
+  ignoreGroupMetadata?: boolean;
+}
+
+/**
+ * Return a list of chats
+ *
+ * @example
+ * ```javascript
+ * // All chats
+ * const chats = await WPP.chat.list();
+ *
+ * // Some chats
+ * const chats = WPP.chat.list({count: 20});
+ *
+ * // 20 chats before specific chat
+ * const chats = WPP.chat.list({count: 20, direction: 'before', id: '[number]@c.us'});
+ *
+ * // Only users chats
+ * const chats = await WPP.chat.list({onlyUsers: true});
+ *
+ * // Only groups chats
+ * const chats = await WPP.chat.list({onlyGroups: true});
+ *
+ * // Only communities chats
+ * const chats = await WPP.chat.list({onlyCommunities: true});
+ *
+ * // Only Newsletter
+ * const chats = await WPP.chat.list({onlyNewsletter: true});
+ *
+ * // Only with label Text
+ * const chats = await WPP.chat.list({withLabels: ['Test']});
+ *
+ * // Only with label id
+ * const chats = await WPP.chat.list({withLabels: ['1']});
+ *
+ * // Only with label with one of text or id
+ * const chats = await WPP.chat.list({withLabels: ['Alfa','5']});
+ *
+ * // Only archived chats
+ * const chats = await WPP.chat.list({onlyArchived: true});
+ *
+ * // Ignore group metadata search
+ * const chats = await WPP.chat.list({ignoreGroupMetadata: true})
+ * ```
+ *
+ * @category Chat
+ */
+export async function list(
+  options: ChatListOptions = {}
+): Promise<ChatModel[]> {
+  // Setting the check to null, so it doesn't break existing codes.
+  const count = options.count == null ? Infinity : options.count;
+  const direction = options.direction === 'before' ? 'before' : 'after';
+
+  // Getting All Chats.
+  // Slice is used here to duplicate the array, then we can modify it without change the WhatsApp internal variables.
+  // Also known as "shallow copy".
+  let models = options.onlyNewsletter
+    ? NewsletterStore.getModelsArray().slice()
+    : ChatStore.getModelsArray().slice();
+
+  // Filtering Based on Options.
+  if (options.onlyUsers) {
+    models = models.filter((c) => c.isUser);
+  }
+
+  if (options.onlyGroups) {
+    models = models.filter((c) => c.id.isGroup());
+  }
+
+  if (options.onlyCommunities) {
+    models = models.filter(
+      (c) => c.id.isGroup() && c.groupMetadata?.groupType === 'COMMUNITY'
+    );
+  }
+
+  if (options.onlyWithUnreadMessage) {
+    models = models.filter((c) => c.hasUnread);
+  }
+
+  if (options.onlyArchived) {
+    models = models.filter((c) => c.archive);
+  }
+
+  if (options.withLabels) {
+    const ids = options.withLabels.map((value) => {
+      const label = LabelStore.findFirst((l) => l.name === value);
+      return label ? label.id : value;
+    });
+
+    models = models.filter((c) => c.labels?.some((id) => ids.includes(id)));
+  }
+
+  // Getting The Chat to start from.
+  // Searching for chat (index) here, so it gets applied after all filtering.
+  const indexChat = options?.id ? get(options.id) : null;
+  const startIndex = indexChat ? models.indexOf(indexChat as any) : 0;
+
+  if (direction === 'before') {
+    const fixStartIndex = startIndex - count < 0 ? 0 : startIndex - count;
+    const fixEndIndex =
+      fixStartIndex + count >= startIndex ? startIndex : fixStartIndex + count;
+    models = models.slice(fixStartIndex, fixEndIndex);
+  } else {
+    models = models.slice(startIndex, startIndex + count);
+  }
+
+  // Attaching Group Metadata on Found Chats.
+  if (!options?.ignoreGroupMetadata) {
+    for (const chat of models) {
+      if (chat.id.isGroup()) {
+        await GroupMetadataStore.find(chat.id);
+      }
+    }
+  }
+
+  return models;
+}

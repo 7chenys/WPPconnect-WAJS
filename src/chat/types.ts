@@ -1,0 +1,155 @@
+/*!
+ * Copyright 2021 WPPConnect Team
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import {
+  ModelPropertiesContructor,
+  MsgKey,
+  MsgModel,
+  SendMsgResultObject,
+  Wid,
+} from '../whatsapp';
+
+export type { SendMsgResultObject };
+
+export interface SendMessageOptions {
+  /**
+   * Create a new chat to a new contact
+   *
+   * @deprecated This option is no longer used. Chats are automatically created when sending messages.
+   * @default false
+   *
+   * @example
+   * ```javascript
+   * WPP.chat.sendTextMessage('[number]@c.us', 'Hello new contact', {
+   *   createChat: true
+   * });
+   * ```
+   */
+  createChat?: boolean;
+
+  /**
+   * Automatic detect and add mentioned contacts with @[number], or mention
+   * everyone in a group with @all
+   *
+   * @default true
+   *
+   * @example
+   * ```javascript
+   * WPP.chat.sendTextMessage('[number]@c.us', 'Hello @123 and @456', {
+   *   detectMentioned: true
+   * });
+   * ```
+   */
+  detectMentioned?: boolean;
+
+  /**
+   * Automatically mark chat is read after send a message
+   *
+   * @default true
+   *
+   * @example
+   * ```javascript
+   * WPP.chat.sendTextMessage('[number]@c.us', 'Replying your message', {
+   *   markIsRead: true
+   * });
+   * ```
+   */
+  markIsRead?: boolean;
+
+  /**
+   *
+   */
+  messageId?: string | MsgKey;
+
+  /**
+   * Define a mentioned list for a message
+   * This option work better with a message with mension
+   *
+   * @example
+   * ```javascript
+   * WPP.chat.sendTextMessage('[number]@c.us', 'Hello @123 and @456', {
+   *   mentionedList: ['123@c.us', '456@c.us']
+   * })
+   * ```
+   */
+  mentionedList?: (string | Wid)[];
+
+  /**
+   * Quote a message, like a reply message
+   *
+   * @example
+   * ```javascript
+   * WPP.chat.sendTextMessage('[number]@c.us', 'This is a reply', {
+   *   quotedMsg: 'true_[number]@c.us_3EB0F435D95D32C4C638'
+   * })
+   * ```
+   */
+  quotedMsg?: string | MsgKey | MsgModel;
+
+  /**
+   * Quote a message using a previously saved payload.
+   * The payload must be the JSON string representation of a raw message.
+   * Raw messages can be obtained when using {@link getMessageById} or {@link getMessages}
+   * When provided it has priority over {@link quotedMsg}.
+   */
+  quotedMsgPayload?: string;
+
+  /**
+   * Wait for send while the ACK of message is SENT(1)
+   *
+   * @default true
+   *
+   * @example
+   * ```javascript
+   * WPP.chat.sendTextMessage('[number]@c.us', 'Wait for sent', {
+   *   waitForAck: true
+   * })
+   * ```
+   */
+  waitForAck?: boolean;
+  /**
+   * Delay some time (in ms) before sending message
+   * While delaying, Typing Status is used to look like a human interaction
+   * @default 0
+   * @example
+   * ```javascript
+   * WPP.chat.sendTextMessage('[number]@c.us', 'Delay with typing', {
+   *   delay: 4000
+   * })
+   * ```
+   */
+  delay?: number;
+}
+
+export interface SendMessageReturn {
+  id: string;
+  from?: string;
+  to?: string;
+  latestEditMsgKey?: MsgKey;
+  ack: number;
+  /**
+   * The result of the send, already resolved.
+   *
+   * It is `null` when the send was not waited for, the value is only available
+   * with the `waitForAck` option.
+   *
+   * Note: awaiting it keeps working, a non promise value is awaited as itself,
+   * but `.then()` is not available.
+   */
+  sendMsgResult: SendMsgResultObject | null;
+}
+
+export type RawMessage = ModelPropertiesContructor<MsgModel>;

@@ -1,0 +1,78 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    env:
+      PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.18.1"
+          registry-url: "https://registry.npmjs.org"
+          cache: "npm"
+
+      - name: Install Dependencies
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: true
+
+      # opcional: remove warning do always-auth se existir em algum lugar
+      - name: Remove legacy npm config
+        run: npm config delete always-auth || true
+
+      # seu prepare já roda no publish (prepare -> husky install + clean + build:prd)
+      - name: Publish to npm (OIDC)
+        run: |
+          if [[ "${{ github.ref }}" == *"-alpha"* ]]; then
+            npm publish --access public --provenance --tag alpha
+          else
+            npm publish --access public --provenance
+          fi
+        env:
+          NODE_AUTH_TOKEN: ""
+          NPM_TOKEN: ""
+
+      - name: Generate Changelog
+        id: generate_changelog
+        run: |
+          changelog=$(npm run changelog:last --silent)
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "${changelog}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref }}
+          name: ${{ github.ref_name }}
+          body: ${{ steps.generate_changelog.outputs.changelog }}
+          draft: false
+          prerelease: ${{ contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
+          files: dist/wppconnect-wa.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update WPPConnect Site
+        if: env.PERSONAL_TOKEN != ''
+        run: gh workflow run update-blog.yml --repo wppconnect-team/wppconnect-team.github.io
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}

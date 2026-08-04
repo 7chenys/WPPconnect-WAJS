@@ -1,0 +1,117 @@
+name: test
+
+on:
+  push:
+    branches:
+      - '*'
+  pull_request:
+    branches:
+      - '*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  provide_wa_versions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 24.18.1
+
+      - name: Get npm cache directory
+        id: npm-cache
+        run: |
+          echo "dir=$(npm config get cache)" >> $GITHUB_OUTPUT
+
+      - name: Setup npm cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.npm-cache.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install Dependencies
+        run: npm ci || npm install
+
+      - uses: actions/github-script@v9
+        id: versions
+        with:
+          script: |
+            const packageJSON = require('./package.json');
+            const waVersion = require('@wppconnect/wa-version');
+            const semver = require('semver');
+
+            const supportedVersion = packageJSON.engines['whatsapp-web'];
+            const allVersions = waVersion.getAvailableVersions();
+            let versions = allVersions.filter(
+              (v) => semver.satisfies(v, supportedVersion, {includePrerelease: true})
+            );
+            versions = versions.map(v => v.split(/^(\d+\.\d+\.\d{5})/).slice(0, -1).join('') + '.x');
+            versions = versions.filter((v,i,a)=>a.indexOf(v)==i);
+
+            return versions.reverse();
+
+    outputs:
+      versions: ${{ steps.versions.outputs.result }}
+
+  test_wa_versions:
+    needs: provide_wa_versions
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        versions: ${{ fromJson(needs.provide_wa_versions.outputs.versions) }}
+        include:
+          - versions: ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 24.18.1
+
+      - name: Get npm cache directory
+        id: npm-cache
+        run: |
+          echo "dir=$(npm config get cache)" >> $GITHUB_OUTPUT
+
+      - name: Setup npm cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.npm-cache.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install Dependencies
+        run: npm ci || npm install
+
+      - name: Set environment variables
+        run: |
+          if [ "${{ github.actor }}" = "renovate" ]; then
+            echo "SEND_WEBHOOK_FAILURE=true" >> $GITHUB_ENV
+          else
+            echo "SEND_WEBHOOK_FAILURE=false" >> $GITHUB_ENV
+          fi
+
+      - name: Test modules resolution
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: npm run update-module-id -- --dry-run
+        env:
+          WA_VERSION: '${{matrix.versions }}'
+          DISCORD_WEBHOOK_URL_FAILURE: '${{ secrets.DISCORD_WEBHOOK_URL_FAILURE }}'
+          SEND_WEBHOOK_FAILURE: '${{ env.SEND_WEBHOOK_FAILURE }}'
+          URL_ACTION: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'

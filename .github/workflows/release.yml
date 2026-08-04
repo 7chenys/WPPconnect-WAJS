@@ -1,0 +1,73 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        type: string
+        description: 'Branch to release from'
+        required: true
+        default: 'main'
+      increment:
+        type: choice
+        description: 'Tipo de incremento: patch, minor, major ou pre*'
+        required: true
+        default: 'patch'
+        options:
+          - patch
+          - minor
+          - major
+          - prepatch
+          - preminor
+          - premajor
+          - prerelease
+      preRelease:
+        type: string
+        description: 'Pre-release tag (e.g. alpha, beta, rc) — only used with pre* increments'
+        required: false
+        default: ''
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          token: ${{ secrets.PERSONAL_TOKEN }}
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Setup GIT
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Setup Node
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 24.18.1
+
+      - name: Get npm cache directory
+        id: npm-cache
+        run: |
+          echo "dir=$(npm config get cache)" >> $GITHUB_OUTPUT
+
+      - name: Setup npm cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.npm-cache.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install Dependencies
+        run: npm ci || npm install
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: true
+
+      - name: Release
+        run: |
+          RELEASE_ARGS="--increment ${{ github.event.inputs.increment }}"
+          if [ -n "${{ github.event.inputs.preRelease }}" ]; then
+            RELEASE_ARGS="$RELEASE_ARGS --preRelease ${{ github.event.inputs.preRelease }}"
+          fi
+          npx release-it $RELEASE_ARGS

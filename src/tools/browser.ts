@@ -1,0 +1,349 @@
+/*!
+ * Copyright 2021 WPPConnect Team
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import * as waVersion from '@wppconnect/wa-version';
+import * as crypto from 'crypto';
+import FileType from 'file-type';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as playwright from 'playwright-chromium';
+import * as url from 'url';
+
+export const URL = 'https://web.whatsapp.com/';
+const WA_VERSION_ENV = process.env['WA_VERSION'];
+const WA_VERSION =
+  WA_VERSION_ENV === 'latest' || !WA_VERSION_ENV
+    ? waVersion.getLatestVersion()
+    : WA_VERSION_ENV;
+const WA_VERSION_DIR = WA_VERSION_ENV === 'latest' ? 'latest' : WA_VERSION;
+let WA_DIR = path.resolve(__dirname, `../../wa-source/${WA_VERSION_DIR}`);
+
+/**
+ * Extract version from HTML content
+ */
+function extractVersionFromHtml(html: string): string | null {
+  // Look for script filenames like: 1034485183_main
+  const match = html.match(/(\d{10,})_main/);
+  if (match) {
+    return `2.3000.${match[1]}`;
+  }
+  return null;
+}
+
+/**
+ * Get the current WA source directory
+ */
+export function getWADir(): string {
+  return WA_DIR;
+}
+
+/**
+ * Backward compatibility export for WA_DIR
+ */
+export const WA_DIR_GETTER = {
+  get value() {
+    return WA_DIR;
+  },
+};
+
+type LaunchArguments = Parameters<
+  typeof playwright.chromium.launchPersistentContext
+>;
+
+export async function preparePage(page: playwright.Page) {
+  if (WA_VERSION_ENV === 'latest') {
+    page.on('response', async (response) => {
+      if (
+        response.url() === URL &&
+        response.request().resourceType() === 'document'
+      ) {
+        try {
+          const body = await response.text();
+
+          // Extract version first
+          const version = extractVersionFromHtml(body);
+          if (version) {
+            // Update WA_DIR to the versioned folder
+            const versionDir = path.resolve(
+              __dirname,
+              `../../wa-source/${version}`
+            );
+            WA_DIR = versionDir;
+            console.log(`📁 Using wa-source/${version}`);
+          }
+
+          // Now save to the correct directory
+          if (!fs.existsSync(WA_DIR)) {
+            fs.mkdirSync(WA_DIR, { recursive: true });
+          }
+          const htmlFilePath = path.join(WA_DIR, 'index.html');
+          fs.writeFileSync(htmlFilePath, body);
+          console.log('💾 Saved HTML to', WA_DIR.split('wa-source/')[1]);
+        } catch (e) {
+          console.error('Failed to save latest HTML:', e);
+        }
+      }
+    });
+  }
+
+  page.route('https://crashlogs.whatsapp.net/**', (route) => {
+    route.abort();
+  });
+  page.route('https://dit.whatsapp.net/deidentified_telemetry', (route) => {
+    route.abort();
+  });
+
+  page.route(
+    /^https:\/\/(web\.whatsapp\.com|static\.whatsapp\.net)\//,
+    async (route, request) => {
+      if (request.url() === URL) {
+        const currentWADir = WA_DIR; // Get current directory
+        if (!fs.existsSync(currentWADir)) {
+          fs.mkdirSync(currentWADir, { recursive: true });
+        }
+        const htmlFilePath = path.join(currentWADir, 'index.html');
+
+        if (WA_VERSION_ENV === 'latest') {
+          console.log('🌐 Passing through to web.whatsapp.com (latest)');
+          return route.continue();
+        }
+
+        console.log('📄 Serving HTML from wa-version package:', WA_VERSION);
+        const htmlContent = waVersion.getPageContent(WA_VERSION);
+        if (!fs.existsSync(htmlFilePath)) {
+          fs.writeFileSync(htmlFilePath, htmlContent);
+          console.log('💾 Saved HTML to wa-source/', WA_VERSION_DIR);
+        }
+        return route.fulfill({
+          status: 200,
+          contentType: 'text/html',
+          body: htmlContent,
+        });
+      }
+
+      const rawFileName = path.basename(url.parse(request.url()).pathname!);
+
+      let fileName = rawFileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+      if (fileName.length > 50) {
+        fileName = fileName.substring(0, 50);
+      }
+      const filePathDist = path.join(
+        path.resolve(__dirname, '../../dist/'),
+        fileName
+      );
+
+      if (
+        request.url().includes('dist') &&
+        fs.existsSync(filePathDist) &&
+        fs.statSync(filePathDist).isFile()
+      ) {
+        console.log('📦 Serving from dist/:', fileName);
+        return route.fulfill({
+          status: 200,
+          contentType: 'text/javascript; charset=UTF-8',
+          body: fs.readFileSync(filePathDist, { encoding: 'utf8' }),
+        });
+      }
+
+      // Always get current WA_DIR for file operations
+      const currentWADir = WA_DIR;
+      const filePathSource = path.join(currentWADir, fileName);
+
+      if (
+        fs.existsSync(filePathSource) &&
+        fs.statSync(filePathSource).isFile()
+      ) {
+        console.log('💾 Serving from wa-source/:', fileName);
+        return route.fulfill({
+          status: 200,
+          contentType: 'text/javascript; charset=UTF-8',
+          body: fs.readFileSync(filePathSource, { encoding: 'utf8' }),
+        });
+      }
+
+      const hash = crypto
+        .createHash('md5')
+        .update(request.url())
+        .digest('hex')
+        .substring(0, 5);
+
+      const filePathSourceHash = path.join(currentWADir, `${hash}-${fileName}`);
+
+      if (
+        fs.existsSync(filePathSourceHash) &&
+        fs.statSync(filePathSourceHash).isFile()
+      ) {
+        console.log(
+          '💾 Serving from wa-source/ (hashed):',
+          `${hash}-${fileName}`
+        );
+        return route.fulfill({
+          status: 200,
+          contentType: 'text/javascript; charset=UTF-8',
+          body: fs.readFileSync(filePathSourceHash, { encoding: 'utf8' }),
+        });
+      }
+
+      if (fileName.endsWith('.js')) {
+        if (!fs.existsSync(currentWADir)) {
+          fs.mkdirSync(currentWADir, { recursive: true });
+        }
+
+        console.log('🌐 Downloading from remote and caching:', fileName);
+        const response = await route.fetch();
+        const body = await response.body();
+        const targetPath = path.join(currentWADir, `${hash}-${fileName}`);
+        fs.writeFileSync(targetPath, body);
+      }
+
+      return route.continue();
+    }
+  );
+
+  page.addInitScript(() => {
+    // Remove existent service worker
+    navigator.serviceWorker
+      .getRegistrations()
+      .then((registrations) => {
+        for (const registration of registrations) {
+          registration.unregister();
+        }
+      })
+      .catch(() => null);
+
+    // Disable service worker registration
+    // @ts-expect-error(eslint-migration) -- Ignore
+    navigator.serviceWorker.register = new Promise(() => {});
+
+    setInterval(() => {
+      window.onerror = console.error;
+      window.onunhandledrejection = console.error;
+    }, 500);
+  });
+
+  page.on('load', async (page) => {
+    await page.addScriptTag({
+      url: `${URL}dist/wppconnect-wa.js`,
+    });
+
+    const mediaPath = path.resolve(__dirname, '../../media/');
+
+    if (!fs.existsSync(mediaPath)) {
+      return;
+    }
+    fs.readdirSync(mediaPath).forEach(async (filename) => {
+      const filePath = path.join(mediaPath, filename);
+      const content = fs.readFileSync(filePath, {
+        encoding: 'base64',
+      });
+
+      const mime = await FileType.fromFile(filePath);
+
+      const base64 = `data:${
+        mime?.mime || 'application/octet-stream'
+      };base64,${content}`;
+
+      page.evaluate(
+        ({ filename, base64 }) => {
+          (window as any).media = (window as any).media || {};
+          (window as any).media[filename] = base64;
+        },
+        { filename, base64 }
+      );
+    });
+  });
+}
+
+export async function getPage(options?: LaunchArguments[1]) {
+  let userDataDir = path.resolve(__dirname, '../../userDataDir');
+  if (Array.isArray(options?.args)) {
+    const index = options?.args.findIndex((a) =>
+      a.startsWith('--user-data-dir')
+    );
+    if (typeof index === 'number' && index > -1) {
+      const param = options?.args[index];
+      options?.args.splice(index, 1);
+      userDataDir = param?.split('=')[1] || userDataDir;
+    }
+  }
+
+  let browser = await playwright.chromium.launchPersistentContext(
+    userDataDir,
+    options
+  );
+
+  /**
+   * WhatsApp Web >= ~2.3000.1044 shows the unsupported-browser page
+   * ("WhatsApp works with Google Chrome 100+") for the "HeadlessChrome"
+   * token reported by headless Chromium and never boots the app. Mask it
+   * with the equivalent regular Chrome user agent.
+   */
+  if (!options?.userAgent) {
+    const probePage = browser.pages().length
+      ? browser.pages()[0]
+      : await browser.newPage();
+    const userAgent = await probePage.evaluate(() => navigator.userAgent);
+    if (userAgent.includes('HeadlessChrome')) {
+      await browser.close();
+      browser = await playwright.chromium.launchPersistentContext(userDataDir, {
+        ...options,
+        userAgent: userAgent.replace('HeadlessChrome', 'Chrome'),
+      });
+    }
+  }
+
+  const page = browser.pages().length
+    ? browser.pages()[0]
+    : await browser.newPage();
+
+  await preparePage(page);
+
+  setTimeout(async () => {
+    console.log('⏳ Waiting for WhatsApp Web to load...');
+    await page.goto(URL, {
+      waitUntil: 'domcontentloaded',
+      timeout: 120000,
+    });
+
+    console.log(
+      '✅ WhatsApp Web loaded, waiting for main stream to be ready...'
+    );
+    await page
+      .waitForFunction(
+        () => (window as any).Debug?.VERSION,
+        {},
+        { timeout: 120000 }
+      )
+      .catch(() => {
+        console.warn(
+          '⚠️ Timeout waiting for Debug.VERSION, main stream might not be ready'
+        );
+      });
+
+    const version = await page
+      .evaluate(() => (window as any).Debug.VERSION)
+      .catch(() => {
+        console.warn(
+          '⚠️ Failed to get Debug.VERSION, main stream might not be ready'
+        );
+        return 'unknown';
+      });
+
+    console.log('WhatsApp Version: ', version);
+  }, 2000);
+
+  return { browser, page };
+}
