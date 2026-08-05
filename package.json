@@ -1,7 +1,7 @@
 {
-  "name": "@wppconnect/wa-js",
+  "name": "@7chenys/wa-js",
   "version": "4.5.0",
-  "description": "WPPConnect/WA-JS is an open-source project with the aim of exporting functions from WhatsApp Web",
+  "description": "Unofficial fixed-version snapshot of WPPConnect WA-JS for personal use",
   "license": "Apache-2.0",
   "author": {
     "name": "Edgard Messias",
@@ -10,8 +10,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/wppconnect-team/wa-js"
+    "url": "git+https://github.com/7chenys/WPPconnect-WAJS.git"
   },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
