@@ -1,4 +1,4 @@
-# @7chenys/wa-js
+# @yanmontain/wa-js
 
 > 非官方固定版本，仅用于维护者自己的项目依赖管理。
 
@@ -28,7 +28,7 @@
 固定安装当前版本：
 
 ```bash
-npm install @7chenys/wa-js@4.5.0 --save-exact
+npm install @yanmontain/wa-js@4.5.0 --save-exact
 ```
 
 如果现有项目仍通过 `@wppconnect/wa-js` 解析依赖，可以使用 npm alias：
@@ -36,7 +36,7 @@ npm install @7chenys/wa-js@4.5.0 --save-exact
 ```json
 {
   "dependencies": {
-    "@wppconnect/wa-js": "npm:@7chenys/wa-js@4.5.0"
+    "@wppconnect/wa-js": "npm:@yanmontain/wa-js@4.5.0"
   }
 }
 ```
