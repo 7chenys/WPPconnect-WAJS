@@ -4,7 +4,7 @@
 
 ## 项目说明
 
-本仓库是 [WPPConnect WA-JS](https://github.com/wppconnect-team/wa-js) 的固定版本快照，当前对应上游版本 `4.5.0`。
+本仓库是 [WPPConnect WA-JS](https://github.com/wppconnect-team/wa-js) 的固定版本快照，当前对应上游版本 `4.6.0`。
 
 建立此仓库和 npm 包的目的，是为个人项目提供可重复安装的固定依赖，避免上游版本变化意外影响现有项目。该快照不会自动跟随上游更新，也不承诺持续维护、兼容性更新、安全更新或技术支持。
 
@@ -28,7 +28,7 @@
 固定安装当前版本：
 
 ```bash
-npm install @yanmontain/wa-js@4.5.0 --save-exact
+npm install @yanmontain/wa-js@4.6.0 --save-exact
 ```
 
 如果现有项目仍通过 `@wppconnect/wa-js` 解析依赖，可以使用 npm alias：
@@ -36,7 +36,7 @@ npm install @yanmontain/wa-js@4.5.0 --save-exact
 ```json
 {
   "dependencies": {
-    "@wppconnect/wa-js": "npm:@yanmontain/wa-js@4.5.0"
+    "@wppconnect/wa-js": "npm:@yanmontain/wa-js@4.6.0"
   }
 }
 ```

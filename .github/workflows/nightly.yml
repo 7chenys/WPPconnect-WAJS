@@ -5,6 +5,9 @@ on:
     branches:
       - 'main'
 
+permissions:
+  contents: write
+
 jobs:
   nightly:
     runs-on: ubuntu-latest
@@ -21,7 +24,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7.0.0
         with:
-          node-version: 24.18.1
+          node-version: 24.19.0
 
       - name: Get npm cache directory
         id: npm-cache
@@ -55,7 +58,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Update Nightly TAG
-        uses: richardsimko/update-tag@v2
+        uses: richardsimko/update-tag@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
