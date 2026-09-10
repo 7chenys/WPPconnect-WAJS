@@ -1,3 +1,3 @@
-## 4.5.0 (2026-07-31)
+## <small>4.6.1 (2026-09-10)</small>
 
-* build(deps-dev): update dependency @wppconnect/wa-version to ^1.5.4476 (#3545) ([9490f3f0e532d089c2be64cab918c3154d0bdd80](https://github.com/wppconnect-team/wa-js/commit/9490f3f0e532d089c2be64cab918c3154d0bdd80)), closes [#3545](https://github.com/wppconnect-team/wa-js/issues/3545)
+* fix: 修复建群内部模块延迟解析 ([be2af32566154ce737099779dd37557b2ca53e1b](https://github.com/7chenys/WPPconnect-WAJS/commit/be2af32566154ce737099779dd37557b2ca53e1b))
