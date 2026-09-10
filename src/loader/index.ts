@@ -599,23 +599,26 @@ function candidatesForHint(hint: string | RegExp): string[] {
 export function searchId(
   condition: SearchModuleCondition,
   reverse = false,
-  hint?: string | RegExp
+  hint?: string | RegExp,
+  { forceFresh = false }: { forceFresh?: boolean } = {}
 ): string | null {
   // Check cache first. Positive results are stable; a cached null is only
   // trustworthy while no new modules have registered since the miss — otherwise
   // the module we wanted may have loaded in the meantime (#3419).
-  const cached = searchIdCache.get(condition);
-  if (cached) {
-    return cached;
-  }
-  if (cached === null) {
-    if (
-      searchIdMissModuleCount.get(condition) ===
-      Object.keys(moduleRequire.m).length
-    ) {
-      return null;
+  if (!forceFresh) {
+    const cached = searchIdCache.get(condition);
+    if (cached) {
+      return cached;
     }
-    // Stale negative cache: new modules appeared, fall through and re-scan.
+    if (cached === null) {
+      if (
+        searchIdMissModuleCount.get(condition) ===
+        Object.keys(moduleRequire.m).length
+      ) {
+        return null;
+      }
+      // Stale negative cache: new modules appeared, fall through and re-scan.
+    }
   }
 
   const allIds = Object.keys(moduleRequire.m);
@@ -662,7 +665,9 @@ export function searchId(
       if (condition(module, moduleId)) {
         debug(`Module found: ${moduleId} - ${condition.toString()}`);
         clearTimeout(timer);
-        searchIdCache.set(condition, moduleId);
+        if (!forceFresh) {
+          searchIdCache.set(condition, moduleId);
+        }
         return moduleId;
       }
     } catch (_error) {
@@ -679,7 +684,9 @@ export function searchId(
       if (condition(module, moduleId)) {
         debug(`Fallback Module found: ${moduleId} - ${condition.toString()}`);
         clearTimeout(timer);
-        searchIdCache.set(condition, moduleId);
+        if (!forceFresh) {
+          searchIdCache.set(condition, moduleId);
+        }
         return moduleId;
       }
     } catch (_error) {
@@ -689,10 +696,12 @@ export function searchId(
 
   clearTimeout(timer);
   debug(`Module not found: ${condition.toString()}`);
-  searchIdCache.set(condition, null);
-  // Remember the module count at miss time so the cached null is re-evaluated
-  // once WhatsApp registers more modules (see searchIdMissModuleCount above).
-  searchIdMissModuleCount.set(condition, allIds.length);
+  if (!forceFresh) {
+    searchIdCache.set(condition, null);
+    // Remember the module count at miss time so the cached null is re-evaluated
+    // once WhatsApp registers more modules (see searchIdMissModuleCount above).
+    searchIdMissModuleCount.set(condition, allIds.length);
+  }
   return null;
 }
 

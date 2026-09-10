@@ -20,7 +20,7 @@ import * as loader from '../../loader';
 import { Wid } from '..';
 import { SANITIZED_VERSION_STR } from '../contants';
 import { exportModule } from '../exportModule';
-import { createGroup } from './createGroup';
+import { resolveCreateGroupForSend } from './createGroupResolver';
 
 /** @whatsapp 79583 */
 export declare function sendCreateGroup(
@@ -65,6 +65,8 @@ loader.injectFallbackModule('sendCreateGroup', {
     ephemeral?: number,
     parentGroup?: Wid
   ) => {
+    const createGroup = await resolveCreateGroupForSend();
+
     if (compare(SANITIZED_VERSION_STR, '2.3000.1027323699', '>=')) {
       return await createGroup(
         {

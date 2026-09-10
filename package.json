@@ -18,6 +18,7 @@
   "files": [
     "dist",
     "README.md",
+    "RELEASE-NOTES.md",
     "LICENSE"
   ],
   "exports": {
@@ -44,6 +45,7 @@
     "prepare": "husky install && npm run clean && npm run build:prd",
     "release": "release-it",
     "test": "playwright test --project tests",
+    "test:group-create-resolver": "node -r ts-node/register/transpile-only tests/create-group-resolver.unit.ts",
     "test:prepare": "playwright test --project prepare --headed",
     "update-models-attributes": "ts-node ./src/tools/updateModelsAttributes.ts",
     "update-module-id": "ts-node ./src/tools/updateModuleID.ts",
