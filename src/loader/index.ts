@@ -950,6 +950,56 @@ export function ensureLazyModule(moduleId: string): Promise<boolean> {
   return pending;
 }
 
+/**
+ * Best-effort bootstrap for a small, named family of lazy WhatsApp Web
+ * components. This is for APIs such as group creation whose exported module
+ * name is not stable enough to add to {@link LAZY_MODULES}.
+ *
+ * Components are loaded sequentially and each one is attempted at most once
+ * per page, so callers cannot turn a missing module into an unbounded loader
+ * loop.
+ */
+export async function ensureLazyComponentsMatching(
+  pattern: RegExp,
+  limit = 4
+): Promise<number> {
+  if (loaderType !== 'meta') {
+    return 0;
+  }
+
+  const bootloader = getBootloader();
+  const componentMap = bootloader?.__debug?.componentMap;
+  if (!bootloader || !componentMap || typeof componentMap.keys !== 'function') {
+    return 0;
+  }
+
+  const maxComponents = Math.max(0, Math.min(4, Math.floor(limit)));
+  const candidates: string[] = [];
+  for (const component of componentMap.keys()) {
+    pattern.lastIndex = 0;
+    if (!pattern.test(component) || bootloadedComponents.has(component)) {
+      continue;
+    }
+    candidates.push(component);
+    if (candidates.length >= maxComponents) {
+      break;
+    }
+  }
+
+  let loaded = 0;
+  for (const component of candidates) {
+    bootloadedComponents.add(component);
+    debug(`Bootloading lazy component '${component}'`);
+    try {
+      await bootloadComponent(bootloader, component);
+      loaded++;
+    } catch (error) {
+      debug(`Bootloading lazy component '${component}' failed: ${error}`);
+    }
+  }
+  return loaded;
+}
+
 async function resolveLazyModule(moduleId: string): Promise<boolean> {
   if (loaderType !== 'meta') {
     return false;

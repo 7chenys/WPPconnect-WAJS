@@ -28,6 +28,7 @@ export type CreateGroupFunction = (...args: any[]) => any;
 export type CreateGroupResolverOptions = {
   findExact: () => unknown;
   findSignatureCandidate: () => unknown;
+  ensureAfterFirstMiss?: () => Promise<unknown>;
   retryLimit?: number;
   retryDelayMs?: number;
   wait?: (delayMs: number) => Promise<void>;
@@ -54,6 +55,7 @@ const waitForRetry = (delayMs: number): Promise<void> =>
 export async function resolveCreateGroupFunction({
   findExact,
   findSignatureCandidate,
+  ensureAfterFirstMiss,
   retryLimit = DEFAULT_RETRY_LIMIT,
   retryDelayMs = DEFAULT_RETRY_DELAY_MS,
   wait = waitForRetry,
@@ -69,6 +71,13 @@ export async function resolveCreateGroupFunction({
 
     if (typeof findSignatureCandidate() === 'function') {
       sawSignatureCandidate = true;
+    }
+
+    // A full-ready WA-JS runtime can still lack an on-demand group-creation
+    // bundle. Bootload a bounded set of plausible group-create components once
+    // before retrying the lookup; this never invokes the native create call.
+    if (retryIndex === 0 && ensureAfterFirstMiss) {
+      await ensureAfterFirstMiss().catch(() => undefined);
     }
 
     if (retryIndex < normalizedRetryLimit) {
@@ -98,6 +107,8 @@ export async function resolveCreateGroupFunction({
  * Meta mutates a module without changing the module count.
  */
 export function resolveCreateGroupForSend(): Promise<typeof createGroup> {
+  const createGroupComponentPattern =
+    /(?:create|new).*group|group.*(?:create|new)/i;
   const findCreateGroup = (condition: (m: any) => boolean) => {
     const moduleId = loader.searchId(condition, false, undefined, {
       forceFresh: true,
@@ -109,5 +120,7 @@ export function resolveCreateGroupForSend(): Promise<typeof createGroup> {
     findExact: () => findCreateGroup(isCreateGroupModule),
     findSignatureCandidate: () =>
       findCreateGroup(isCreateGroupSignatureCandidate),
+    ensureAfterFirstMiss: () =>
+      loader.ensureLazyComponentsMatching(createGroupComponentPattern),
   }) as Promise<typeof createGroup>;
 }

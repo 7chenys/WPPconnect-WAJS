@@ -60,6 +60,28 @@ async function testDelayedModuleResolution(): Promise<void> {
   );
 }
 
+async function testLazyBundleRecoveryRunsOnceBeforeRetry(): Promise<void> {
+  let searches = 0;
+  let lazyLoads = 0;
+  const nativeCreateGroup = () => undefined;
+
+  const resolved = await resolveCreateGroupFunction({
+    findExact: () => {
+      searches += 1;
+      return lazyLoads === 1 ? nativeCreateGroup : undefined;
+    },
+    findSignatureCandidate: () => undefined,
+    ensureAfterFirstMiss: async () => {
+      lazyLoads += 1;
+    },
+    wait: async () => undefined,
+  });
+
+  assert.equal(resolved, nativeCreateGroup);
+  assert.equal(searches, 2);
+  assert.equal(lazyLoads, 1);
+}
+
 async function testPendingModuleResolution(): Promise<void> {
   let waits = 0;
 
@@ -101,6 +123,7 @@ async function testSignatureMismatch(): Promise<void> {
 
 async function main(): Promise<void> {
   await testDelayedModuleResolution();
+  await testLazyBundleRecoveryRunsOnceBeforeRetry();
   await testPendingModuleResolution();
   await testSignatureMismatch();
 }
